@@ -30,22 +30,27 @@ values."
    dotspacemacs-configuration-layer-path '()
    ;; List of configuration layers to load.
    dotspacemacs-configuration-layers
-   '(go
+   '(
+     ;; ling
      ;; ----------------------------------------------------------------
      ;; Example of useful layers you may want to use right away.
      ;; Uncomment some layer names and press <SPC f e R> (Vim style) or
      ;; <M-m f e R> (Emacs style) to install them.
      ;; ----------------------------------------------------------------
      ansible
+     lsp
+     (go :variables
+         go-backend 'lsp
+         go-tab-width 4
+         godoc-at-point-function 'godoc-gogetdoc)
+     auto-completion
      terraform
      nginx
-     exec-path-from-shell
-     company-go
      lua
      yaml
      python
-     helm
      auto-completion
+     helm
      better-defaults
      emacs-lisp
      ;; git
@@ -62,11 +67,11 @@ values."
    ;; wrapped in a layer. If you need some configuration for these
    ;; packages, then consider creating a layer. You can also put the
    ;; configuration in `dotspacemacs/user-config'.
-   dotspacemacs-additional-packages '()
+   dotspacemacs-additional-packages '(auto-complete)
    ;; A list of packages that cannot be updated.
    dotspacemacs-frozen-packages '()
    ;; A list of packages that will not be installed and loaded.
-   dotspacemacs-excluded-packages '()
+   dotspacemacs-excluded-packages '(lsp-go company-lsp)
    ;; Defines the behaviour of Spacemacs when installing packages.
    ;; Possible values are `used-only', `used-but-keep-unused' and `all'.
    ;; `used-only' installs only explicitly used packages and uninstall any
@@ -235,7 +240,7 @@ values."
    ;; If non nil the frame is maximized when Emacs starts up.
    ;; Takes effect only if `dotspacemacs-fullscreen-at-startup' is nil.
    ;; (default nil) (Emacs 24.4+ only)
-   dotspacemacs-maximized-at-startup nil
+   dotspacemacs-maximized-at-startup t
    ;; A value from the range (0..100), in increasing opacity, which describes
    ;; the transparency level of a frame when it's active or selected.
    ;; Transparency can be toggled through `toggle-transparency'. (default 90)
@@ -254,6 +259,7 @@ values."
    ;; scrolling overrides the default behavior of Emacs which recenters point
    ;; when it reaches the top or bottom of the screen. (default t)
    dotspacemacs-smooth-scrolling t
+
    ;; Control line numbers activation.
    ;; If set to `t' or `relative' line numbers are turned on in all `prog-mode' and
    ;; `text-mode' derivatives. If set to `relative', line numbers are relative.
@@ -302,25 +308,67 @@ values."
    ))
 
 (defun dotspacemacs/user-init ()
-  "Initialization function for user code.
-It is called immediately after `dotspacemacs/init', before layer configuration
-executes.
- This function is mostly useful for variables that need to be set
-before packages are loaded. If you are unsure, you should try in setting them in
-`dotspacemacs/user-config' first."
-(setq configuration-layer-elpa-archives
+
+  (setq load-path (cons (file-truename "~/.spacemacs.d/") load-path))
+
+  (setq configuration-layer-elpa-archives
     '(("melpa-cn" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
       ("org-cn"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
       ("gnu-cn"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")))
+
   )
 
+
+
 (defun dotspacemacs/user-config ()
-  "Configuration function for user code.
-This function is called at the very end of Spacemacs initialization after
-layers configuration.
-This is the place where most of your configurations should be done. Unless it is
-explicitly specified that a variable should be set before a package is loaded,
-you should place your code here."
+
+  (setq custom-file (expand-file-name "lsp-go.el" dotspacemacs-directory))
+  (setq custom-file (expand-file-name "go-autocomplete.el" dotspacemacs-directory))
+
+  (setq exec-path (cons "/Users/wangshiling/code/go/bin" exec-path))
+  (setenv "PATH" (concat "/Users/wangshiling/code/go/bin:" (getenv "PATH")))
+
+
+  ;; auto complete config
+  (require 'go-autocomplete)
+  (require 'auto-complete-config)
+  (ac-config-default)
+
+  ;; ;; lsp-mode config
+  ;; (use-package lsp-mode
+  ;;   :hook (go-mode . lsp-deferred)
+  ;;   :commands (lsp lsp-deferred))
+
+  ;; emacs proxy
+  (setq url-proxy-services
+        '(("no_proxy" . "^\\(localhost\\|127.0.0.1\\|192.168.*\\)")
+          ("http" . "127.0.0.1:6152")
+          ("https" . "127.0.0.1:6152")))
+
+  (setenv "no_proxy" "^\\(localhost\\|127.0.0.1\\|192.168.*\\)")
+  (setenv "http_proxy" "http://127.0.0.1:6152")
+  (setenv "https_proxy" "http://127.0.0.1:6152")
+
+  (setq lsp-auto-guess-root nil)
+  (setq lsp-ui-doc-enable nil)
+  (setq lsp-ui-sideline-enable nil)
+  (setq lsp-prefer-flymake :none)
+
+  ;; project path settings
+  (setq current-project-path (projectile-project-root))
+
+  (defun set-project-path (relative-path)
+    (interactive
+     (list (read-string "relative path: " "." nil nil nil)))
+    (setq current-project-path (file-truename relative-path)))
+
+  (defun get-project-path ()
+    (interactive)
+    (message current-project-path))
+
+  ;; lsp-mode config
+
+  ;; other config
   (setq create-lockfiles nil)
   (defadvice save-buffers-kill-emacs (around no-y-or-n activate)
     (flet ((yes-or-no-p (&rest args) t)
@@ -331,34 +379,13 @@ you should place your code here."
   (set-face-attribute 'default nil :height 140)
   (global-linum-mode 1)
   (package-initialize)
-  (elpy-enable)
   (with-eval-after-load 'company
     (define-key company-active-map (kbd "C-w") 'evil-delete-backward-word)
     )
   (with-eval-after-load 'helm
     (define-key helm-map (kbd "C-w") 'evil-delete-backward-word)
     )
-  (use-package elpy
-    :ensure t
-    :init
-    (elpy-enable)
-    )
-  ;; go complete
-  ;; (add-to-list 'load-path "~/.spacemacs.d/bin/")
-  ;; (autoload 'go-mode "go-mode" nil t)
-  ;; (add-to-list 'auto-mode-alist '("\\.go\\'" . go-mode))
 
-  ;; gocode configurations
-  (require 'go-autocomplete)
-  (require 'auto-complete-config)
-  (ac-config-default)
-
-  ;; path for mac
-  (when (memq window-system '(mac ns))
-    (exec-path-from-shell-initialize)
-    (exec-path-from-shell-copy-env "GOPATH"))
-
-  ;; tab 4 space for golang
   )
 
 ;; Do not write anything past this comment. This is where Emacs will
@@ -389,7 +416,7 @@ This function is called at the very end of Spacemacs initialization."
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (helm-gtags godoctor go-tag go-rename go-impl go-gen-test go-fill-struct ggtags flycheck-golangci-lint dap-mode lsp-treemacs bui lsp-mode markdown-mode counsel-gtags counsel swiper ivy company-go yapfify yaml-mode xterm-color unfill terraform-mode hcl-mode shell-pop pyvenv pytest pyenv-mode py-isort pip-requirements nginx-mode mwim multi-term lua-mode live-py-mode jinja2-mode hy-mode dash-functional helm-pydoc go-guru go-eldoc go-mode git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-commit with-editor transient git-gutter flyspell-correct-helm flyspell-correct flycheck-pos-tip pos-tip flycheck eshell-z eshell-prompt-extras esh-help diff-hl cython-mode auto-dictionary ansible-doc ansible anaconda-mode pythonic ws-butler winum which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org spaceline powerline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el paradox spinner org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint indent-guide hydra lv hungry-delete hl-todo highlight-parentheses highlight-numbers parent-mode highlight-indentation helm-themes helm-swoop helm-projectile projectile pkg-info epl helm-mode-manager helm-make helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido flx fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired f evil-tutor evil-surround evil-search-highlight-persist highlight evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state smartparens evil-indent-plus evil-iedit-state iedit evil-exchange evil-escape evil-ediff evil-args evil-anzu anzu evil goto-chg undo-tree eval-sexp-fu elisp-slime-nav dumb-jump dash s diminish define-word column-enforce-mode clean-aindent-mode bind-map bind-key auto-highlight-symbol auto-compile packed aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line helm avy helm-core popup async))))
+    (web-beautify tide typescript-mode tern prettier-js nodejs-repl livid-mode skewer-mode js2-refactor multiple-cursors js2-mode js-doc import-js grizzl impatient-mode htmlize simple-httpd helm-gtags ggtags lsp-mode counsel-gtags counsel swiper ivy add-node-modules-path yapfify yaml-mode xterm-color unfill terraform-mode hcl-mode shell-pop pyvenv pytest pyenv-mode py-isort pip-requirements nginx-mode mwim multi-term lua-mode live-py-mode jinja2-mode hy-mode dash-functional helm-pydoc go-guru go-eldoc go-mode git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-commit with-editor transient git-gutter flyspell-correct-helm flyspell-correct flycheck-pos-tip pos-tip flycheck eshell-z eshell-prompt-extras esh-help diff-hl cython-mode auto-dictionary ansible-doc ansible anaconda-mode pythonic ws-butler winum which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org spaceline powerline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el paradox spinner org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint indent-guide hydra lv hungry-delete hl-todo highlight-parentheses highlight-numbers parent-mode highlight-indentation helm-themes helm-swoop helm-projectile projectile pkg-info epl helm-mode-manager helm-make helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido flx fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired f evil-tutor evil-surround evil-search-highlight-persist highlight evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state smartparens evil-indent-plus evil-iedit-state iedit evil-exchange evil-escape evil-ediff evil-args evil-anzu anzu evil goto-chg undo-tree eval-sexp-fu elisp-slime-nav dumb-jump dash s diminish define-word column-enforce-mode clean-aindent-mode bind-map bind-key auto-highlight-symbol auto-compile packed aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line helm avy helm-core popup async))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
